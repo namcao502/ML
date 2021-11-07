@@ -1,3 +1,4 @@
+#%% Import Library
 import investpy
 import pandas as pd
 import datetime as dt
@@ -11,14 +12,18 @@ from tensorflow.keras.layers import Dense, Dropout, LSTM
 
 import matplotlib.pyplot as plt
 
-# Load data
-start = '01/06/2009'
-end = dt.datetime.now().strftime("%d/%m/%Y")
-company = 'FB'
-df = investpy.get_stock_historical_data(stock=company, country='United States', from_date=start, to_date=end)
+import joblib 
 
-df = pd.DataFrame(df)
-print(df)
+#%% Load data
+# start = '01/06/2009'
+# end = dt.datetime.now().strftime("%d/%m/%Y")
+
+company = 'FB'
+# df = investpy.get_stock_historical_data(stock=company, country='United States', from_date=start, to_date=end)
+
+# df = pd.DataFrame(df)
+# print(df)
+df = pd.read_csv('FB.csv')
 
 df['H-L'] = df['High'] - df['Low']
 df['O-C'] = df['Open'] - df['Close']
@@ -36,8 +41,7 @@ df.dropna(inplace=True)
 df.to_csv(f"{company}.csv")
 print("Done Loading Data")
 
-
-# Process Data
+#%% Process Data
 pre_day = 30
 scala_x = MinMaxScaler(feature_range=(0, 1))
 scala_y = MinMaxScaler(feature_range=(0, 1))
@@ -62,31 +66,44 @@ y_test = np.array(y_total[len(y_total)-test_size:])
 
 print(x_train.shape, y_train.shape, x_test.shape, y_test.shape)
 
-# Build Model
+#%% Build Model
 model = Sequential()
+# def store_model(model, model_name = ""):
+#     if model_name == "": 
+#         model_name = type(model).__name__
+#     joblib.dump(model, model_name + '_model.pkl')
+# def load_model(model_name):
+#     model = joblib.load(model_name + '_model.pkl')
+#     return model
 
-model.add(LSTM(units=60, return_sequences=True, input_shape=(x_train.shape[1], x_train.shape[2])))
-model.add(Dropout(0.2))
-model.add(LSTM(units=60, return_sequences=True))
-model.add(Dropout(0.2))
-model.add(LSTM(units=60, return_sequences=True))
-model.add(Dropout(0.2))
-model.add(LSTM(units=60, return_sequences=True))
-model.add(Dropout(0.2))
-model.add(LSTM(units=60))
-model.add(Dropout(0.2))
-model.add(Dense(units=len(cols_y)))
+new_training = False
+if new_training:
+    model.add(LSTM(units=60, return_sequences=True, input_shape=(x_train.shape[1], x_train.shape[2])))
+    model.add(Dropout(0.2))
+    model.add(LSTM(units=60, return_sequences=True))
+    model.add(Dropout(0.2))
+    model.add(LSTM(units=60, return_sequences=True))
+    model.add(Dropout(0.2))
+    model.add(LSTM(units=60, return_sequences=True))
+    model.add(Dropout(0.2))
+    model.add(LSTM(units=60))
+    model.add(Dropout(0.2))
+    model.add(Dense(units=len(cols_y)))
+    model.compile(optimizer='adam', loss='mean_squared_error')
+    model.fit(x_train, y_train, epochs=10, steps_per_epoch=40, use_multiprocessing=True)
+    model.save(f"{company}.h5")    
+    # store_model(model, model_name = f"{company}")
+else:
+    from tensorflow import keras
+    model = keras.models.load_model(f"{company}.h5")
 
-model.compile(optimizer='adam', loss='mean_squared_error')
-model.fit(x_train, y_train, epochs=120, steps_per_epoch=40, use_multiprocessing=True)
-model.save(f"{company}.h5")
 print("Done Training Model")
 
-# Testing
+#%% Testing
 predict_prices = model.predict(x_test)
 predict_prices = scala_y.inverse_transform(predict_prices)
 
-# Ploting the Stat
+#%% Ploting the Stat
 real_price = df[len(df)-test_size:]['Close'].values.reshape(-1, 1)
 real_price = np.array(real_price)
 real_price = real_price.reshape(real_price.shape[0], 1)
@@ -100,7 +117,7 @@ plt.ylim(bottom=0)
 plt.legend()
 plt.show()
 
-# Make Prediction
+#%% Make Prediction
 x_predict = df[len(df)-pre_day:][cols_x].values.reshape(-1, len(cols_x))
 x_predict = scala_x.transform(x_predict)
 x_predict = np.array(x_predict)
@@ -109,4 +126,5 @@ prediction = model.predict(x_predict)
 prediction = scala_y.inverse_transform(prediction)
 print(prediction)
 
-
+#%%
+# %%
